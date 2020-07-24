@@ -1,193 +1,264 @@
 #include <iostream>
 #include <cctype>
 
-enum class TokenType : int {
+enum class TokenType : char {
 
-    OPERATOR,       //0
-    NUMBER,         //1
-    END_OF_FILE,    //2
-    INVALID         //3
+	INVALID = -1,		//A invalid Token
+	END_OF_FILE = 0,	//The Null-Termination Character at the end of every file
+
+	BINARY_OPERATOR,	//A binary operator (+*-/)
+	NUMBER				//A positive non-floating number (0,1,2,...)
 
 };
 
 struct Token {
 
-    TokenType type;
-    
-    union {
+	TokenType type;
+	
+	union {
 
-        char character;
-        int number;
+		char character;
+		int number;
 
-    };
+	};
 
-    Token(TokenType type) : type(type), character('\0') {};
-    Token(TokenType type, char character) : type(type), character(character) {};
-    Token(TokenType type, int number) : type(type), number(number) {};
-
-};
-
-char* input;
-
-Token nextToken() {
-
-    while(isspace(*input)) input++;
-    
-    switch(*input) {
-
-        case '\0': {
-
-            return Token(TokenType::END_OF_FILE);
-
-        }
-
-        case '+':
-        case '-':
-        case '*':
-        case '/': {
-
-            return Token(TokenType::OPERATOR, *(input++));
-
-        }
-
-        default: {
-
-            if(isdigit(*input)) {
-
-                int number = 0;
-
-                while(isdigit(*input)) {
-
-                    number *= 10;
-                    number += (*input - '0');
-
-                    input++;
-
-                }
-
-                
-                return Token(TokenType::NUMBER, number);
-
-            }
-
-            return Token(TokenType::INVALID);
-
-        }
-
-    }
-
-}
-
-struct TreeNode {
-    
-    TreeNode* left;
-    char operation;
-
-    union {
-
-        TreeNode* right;
-        int number;
-
-    };
-
-    TreeNode(int number) : left(nullptr), operation('\0'), number(number) {};
-    TreeNode(TreeNode* left, char operation, TreeNode* right) : left(left), operation(operation), right(right) {};
+	Token(TokenType type) : type(type), character('\0') {};
+	Token(TokenType type, char character) : type(type), character(character) {};
+	Token(TokenType type, int number) : type(type), number(number) {};
 
 };
 
-int representation_offset = 0;
+std::ostream& operator<<(std::ostream& stream, const Token& token) {
 
-std::ostream& operator<<(std::ostream& stream, const TreeNode& tree) {
+	stream << '[';
 
-    stream << std::string(representation_offset, ' ') << "> ";
+	switch(token.type) {
 
-    if(tree.operation) {
+		case TokenType::INVALID: {
 
-        stream << tree.operation << '\n';
+			stream << "INVALID";
+			break;
 
-        representation_offset += 2;
-        stream << *tree.left;
-        stream << *tree.right;
-        representation_offset -= 2;
+		}
 
-    } else {
+		case TokenType::END_OF_FILE: {
 
-        stream << tree.number << '\n';
+			stream << "EOF";
+			break;
 
-    }
+		}
 
-    return stream;
+		case TokenType::BINARY_OPERATOR: {
+
+			stream << "Binary Operator: " << token.character;
+			break;
+
+		}
+
+		case TokenType::NUMBER: {
+
+			stream << "Number: " << token.number;
+			break;
+
+		}
+
+	}
+
+	stream << ']';
+	return stream;
 
 }
 
+char* previous_input;
+
+Token nextToken(char*& input) {
+
+	while(isspace(*input)) input++; //Skip all spaces not coresponding to a token
+
+	previous_input = input; //Store the previous offset in a backup variable to use a lookahead
+
+	switch(*input) {
+
+		case '\0': return Token(TokenType::END_OF_FILE);
+
+		case '+':
+		case '-':
+		case '*':
+		case '/': return Token(TokenType::BINARY_OPERATOR, *(input++));
+
+		default: { //Non single-character Tokens
+
+			if(isdigit(*input)) { //Check for number token
+
+				int number = 0;
+
+				while(isdigit(*input)) {
+
+					number *= 10;
+					number += (*input - '0'); //Convert character to representing digit
+
+					input++;
+
+				}
+
+				return Token(TokenType::NUMBER, number);
+
+			}
+
+			return Token(TokenType::INVALID); //Invalid token
+
+		}
+
+	}
+
+}
+
+struct BinaryTree {
+
+	char operation; //The operator or Null to specify that this node contains a number
+
+	union {
+
+		BinaryTree* children[2]; //The 2 children (left and right) of the tree
+		int number;
+
+	};
+
+	BinaryTree(int number) : operation('\0'), number(number) {};
+	BinaryTree(BinaryTree* left, char operation, BinaryTree* right) : operation(operation) {
+
+		children[0] = left;
+		children[1] = right;
+
+	}
+
+	~BinaryTree() {
+
+		if(operation) {
+
+			delete children[0];
+			delete children[1];
+
+		}
+
+	}
+
+};
+
+int representation_offset = 0; //The space-offset for representing the binary trees
+
+std::ostream& operator<<(std::ostream& stream, const BinaryTree& tree) {
+
+	stream << std::string(representation_offset, ' ') << "> ";
+
+	if(tree.operation) {
+
+		stream << tree.operation << '\n';
+
+		representation_offset += 2;
+		stream << *tree.children[0];
+		stream << *tree.children[1];
+		representation_offset -= 2;
+
+	} else {
+
+		stream << tree.number << '\n';
+
+	}
+
+	return stream;
+
+}
 
 int getPrecedence(char operation) {
 
-    switch(operation) {
+	switch(operation) {
 
-        case '+': case '-': return 1;
-        case '*': case '/': return 2;
+		case '+': case '-': return 1;
+		case '*': case '/': return 2;
 
-        default: return 0;
+		default: return 0;
 
-    }
+	}
 
 }
 
-TreeNode* parse(int previous_precedence) {
+BinaryTree* parse(char*& input, int previous_precedence) {
 
-    Token primary = nextToken();
-    if(primary.type != TokenType::NUMBER) {
+	Token primary = nextToken(input);
+	if(primary.type != TokenType::NUMBER) {
 
-        std::cerr << "Exspected Primary!";
-        exit(-1);
+		std::cerr << "Exspected Primary!";
+		exit(-1);
 
-    }
+	}
 
-    TreeNode* left = new TreeNode(primary.number);
+	BinaryTree* left = new BinaryTree(primary.number);
 
-    while(true) {
+	while(true) {
 
-        Token operation = nextToken();
-        if(operation.type != TokenType::OPERATOR) {
+		Token operation = nextToken(input);
+		if(operation.type != TokenType::BINARY_OPERATOR) {
 
-            if(operation.type == TokenType::END_OF_FILE) break;
+			if(operation.type == TokenType::END_OF_FILE) break;
 
-            std::cerr << "Exspected another operator or end!\n";
-            exit(-1);
+			std::cerr << "Exspected another operator or end!\n";
+			exit(-1);
 
-        }
+		}
 
-        int precedence = getPrecedence(operation.character);
-        if(!precedence || (precedence <= previous_precedence)) break;
+		int precedence = getPrecedence(operation.character);
+		if(!precedence || (precedence <= previous_precedence)) {
 
-        TreeNode* right = parse(precedence);
-        left = new TreeNode(left, operation.character, right);
+			input = previous_input; //Undo the peeking of the operator-token
+			break;
 
-    }
+		}
 
-    return left;
+		left = new BinaryTree(left, operation.character, parse(input, precedence));
+
+	}
+
+	return left;
+
+}
+
+int binaryOperation(int left, char operation, int right) {
+
+	switch(operation) { //Apply the operator to the values
+
+		case '+': return (left + right);
+		case '-': return (left - right);
+		case '*': return (left * right);
+		case '/': return (left / right);
+
+	}
+
+}
+
+int solve(const BinaryTree& tree) {
+
+	if(!tree.operation) return tree.number;
+
+	return binaryOperation(solve(*(tree.children[0])), tree.operation, solve(*(tree.children[1])));
 
 }
 
 int main() {
-    
-    char* input_fixed = new char[64];
 
-    while(true) {
+	char input[64]; //Create input buffer
 
-        std::cout << ">> ";
-        std::cin.getline(input_fixed, 64);
+	while(true) {
 
-        if(!strcmp(input_fixed, "exit")) break;
+		std::cout << ">> ";
+		std::cin.getline(input, 64);
 
-        input = input_fixed;
+		char* input_modifiable = input; //Create a copy of the pointer, that will later be offset
 
-        TreeNode* tree = parse(0);
-        std::cout << *tree;
+		BinaryTree* tree = parse(input_modifiable, 0);
+		std::cout << solve(*tree) << '\n';
+		delete tree;
 
-    }
-
-    delete[] input;
+	}
 
 }
