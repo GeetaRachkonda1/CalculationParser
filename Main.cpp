@@ -7,7 +7,9 @@ enum class TokenType : char {
 	END_OF_FILE = 0,	//The Null-Termination Character at the end of every file
 
 	BINARY_OPERATOR,	//A binary operator (+,-,*,/,%,&,&&,|,||,^)
-	NUMBER				//A positive non-floating number (0,1,2,...)
+	NUMBER,				//A positive non-floating number (0,1,2,...)
+	OPEN_PARENTHESIS,	//A opening parenthesis: (
+	CLOSE_PARENTHESIS	//A closing patenthesis: )
 
 };
 
@@ -56,6 +58,20 @@ std::ostream& operator<<(std::ostream& stream, const Token& token) {
 
 		}
 
+		case TokenType::OPEN_PARENTHESIS: {
+
+			stream << '(';
+			break;
+
+		}
+
+		case TokenType::CLOSE_PARENTHESIS: {
+
+			stream << ')';
+			break;
+
+		}
+
 	}
 
 	stream << ']';
@@ -73,7 +89,19 @@ Token nextToken(char*& input) {
 
 	switch(*input) {
 
-		case '\0': return Token(TokenType::END_OF_FILE);
+		case '\0': return Token(TokenType::END_OF_FILE); //Single-character tokens
+
+		case '(': {
+
+			input++;
+			return Token(TokenType::OPEN_PARENTHESIS);
+
+		}
+		case ')': {
+			input++;
+			return Token(TokenType::CLOSE_PARENTHESIS);
+
+		}
 
 		case '+':
 		case '-':
@@ -195,29 +223,47 @@ int getPrecedence(int operation) {
 BinaryTree* parse(char*& input, int previous_precedence) {
 
 	Token primary = nextToken(input);
-	if(primary.type != TokenType::NUMBER) {
+	BinaryTree* left;
 
-		std::cerr << "Exspected Primary!";
-		exit(-1);
+	switch(primary.type) {
 
+		case TokenType::NUMBER: {
+
+			left = new BinaryTree(primary.number);
+			break;
+
+		}
+
+		case TokenType::OPEN_PARENTHESIS: {
+
+			left = parse(input, 0); //Parse the in parenthesis enclosed part as a sub-calculation
+
+			if(nextToken(input).type != TokenType::CLOSE_PARENTHESIS) { //Check for closing parenthesis
+
+				std::cerr << "Exspected closing Parenthesis!";
+				exit(-1);
+
+			}
+
+			break;
+
+		}
+	
+		default: {
+
+			std::cerr << "Exspected Primary!";
+			exit(-1);
+
+		}
+	
 	}
-
-	BinaryTree* left = new BinaryTree(primary.number);
 
 	while(true) {
 
 		Token operation = nextToken(input);
-		if(operation.type != TokenType::BINARY_OPERATOR) {
-
-			if(operation.type == TokenType::END_OF_FILE) break;
-
-			std::cerr << "Exspected another operator or end!\n";
-			exit(-1);
-
-		}
-
 		int precedence = getPrecedence(operation.number);
-		if(!precedence || (precedence <= previous_precedence)) {
+
+		if((operation.type != TokenType::BINARY_OPERATOR) || !precedence || (precedence <= previous_precedence)) {
 
 			input = previous_input; //Undo the peeking of the operator-token
 			break;
