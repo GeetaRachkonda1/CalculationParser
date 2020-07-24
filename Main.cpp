@@ -6,7 +6,7 @@ enum class TokenType : char {
 	INVALID = -1,		//A invalid Token
 	END_OF_FILE = 0,	//The Null-Termination Character at the end of every file
 
-	BINARY_OPERATOR,	//A binary operator (+*-/)
+	BINARY_OPERATOR,	//A binary operator (+,-,*,/,%,&,&&,|,||,^)
 	NUMBER				//A positive non-floating number (0,1,2,...)
 
 };
@@ -15,15 +15,9 @@ struct Token {
 
 	TokenType type;
 	
-	union {
+	int number;
 
-		char character;
-		int number;
-
-	};
-
-	Token(TokenType type) : type(type), character('\0') {};
-	Token(TokenType type, char character) : type(type), character(character) {};
+	Token(TokenType type) : type(type), number(0) {};
 	Token(TokenType type, int number) : type(type), number(number) {};
 
 };
@@ -50,7 +44,7 @@ std::ostream& operator<<(std::ostream& stream, const Token& token) {
 
 		case TokenType::BINARY_OPERATOR: {
 
-			stream << "Binary Operator: " << token.character;
+			stream << "Binary Operator: " << (char) token.number;
 			break;
 
 		}
@@ -84,7 +78,17 @@ Token nextToken(char*& input) {
 		case '+':
 		case '-':
 		case '*':
-		case '/': return Token(TokenType::BINARY_OPERATOR, *(input++));
+		case '/':
+		case '%':
+		case '^': return Token(TokenType::BINARY_OPERATOR, *(input++)); //Single-character operators
+
+		case '&':
+		case '|': { //Possible double-character operators
+
+			if(*input == *(input++)) return Token(TokenType::BINARY_OPERATOR, (*(input++) + 256));
+			return Token(TokenType::BINARY_OPERATOR, *input);
+
+		}
 
 		default: { //Non single-character Tokens
 
@@ -115,7 +119,7 @@ Token nextToken(char*& input) {
 
 struct BinaryTree {
 
-	char operation; //The operator or Null to specify that this node contains a number
+	int operation; //The operator or Null to specify that this node contains a number
 
 	union {
 
@@ -124,8 +128,8 @@ struct BinaryTree {
 
 	};
 
-	BinaryTree(int number) : operation('\0'), number(number) {};
-	BinaryTree(BinaryTree* left, char operation, BinaryTree* right) : operation(operation) {
+	BinaryTree(int number) : operation(0), number(number) {};
+	BinaryTree(BinaryTree* left, int operation, BinaryTree* right) : operation(operation) {
 
 		children[0] = left;
 		children[1] = right;
@@ -153,7 +157,7 @@ std::ostream& operator<<(std::ostream& stream, const BinaryTree& tree) {
 
 	if(tree.operation) {
 
-		stream << tree.operation << '\n';
+		stream << (char) tree.operation << '\n';
 
 		representation_offset += 2;
 		stream << *tree.children[0];
@@ -170,12 +174,17 @@ std::ostream& operator<<(std::ostream& stream, const BinaryTree& tree) {
 
 }
 
-int getPrecedence(char operation) {
+int getPrecedence(int operation) {
 
 	switch(operation) {
 
-		case '+': case '-': return 1;
-		case '*': case '/': return 2;
+		case '*': case '/': case '%': return 7;
+		case '+': case '-': return 6;
+		case '&': return 5;
+		case '|': return 4;
+		case ('&' + 256): return 3;
+		case '^': return 2;
+		case ('|' + 256): return 1;
 
 		default: return 0;
 
@@ -207,7 +216,7 @@ BinaryTree* parse(char*& input, int previous_precedence) {
 
 		}
 
-		int precedence = getPrecedence(operation.character);
+		int precedence = getPrecedence(operation.number);
 		if(!precedence || (precedence <= previous_precedence)) {
 
 			input = previous_input; //Undo the peeking of the operator-token
@@ -215,7 +224,7 @@ BinaryTree* parse(char*& input, int previous_precedence) {
 
 		}
 
-		left = new BinaryTree(left, operation.character, parse(input, precedence));
+		left = new BinaryTree(left, operation.number, parse(input, precedence));
 
 	}
 
@@ -223,7 +232,7 @@ BinaryTree* parse(char*& input, int previous_precedence) {
 
 }
 
-int binaryOperation(int left, char operation, int right) {
+int binaryOperation(int left, int operation, int right) {
 
 	switch(operation) { //Apply the operator to the values
 
@@ -231,6 +240,12 @@ int binaryOperation(int left, char operation, int right) {
 		case '-': return (left - right);
 		case '*': return (left * right);
 		case '/': return (left / right);
+		case '%': return (left % right);
+		case '&': return (left & right);
+		case '^': return (left ^ right);
+		case '|': return (left | right);
+		case ('&' + 256): return (left && right);
+		case ('|' + 256): return (left || right);
 
 	}
 
