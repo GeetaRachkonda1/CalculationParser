@@ -220,7 +220,9 @@ int getPrecedence(int operation) {
 
 }
 
-BinaryTree* parse(char*& input, int previous_precedence) {
+BinaryTree* parse(char*& input);
+
+BinaryTree* parse(char*& input, const int& previous_precedence) {
 
 	Token primary = nextToken(input);
 	BinaryTree* left;
@@ -236,11 +238,11 @@ BinaryTree* parse(char*& input, int previous_precedence) {
 
 		case TokenType::OPEN_PARENTHESIS: {
 
-			left = parse(input, 0); //Parse the in parenthesis enclosed part as a sub-calculation
+			left = parse(input); //Parse the in parenthesis enclosed part as a sub-calculation
 
 			if(nextToken(input).type != TokenType::CLOSE_PARENTHESIS) { //Check for closing parenthesis
 
-				std::cerr << "Exspected closing Parenthesis!";
+				std::cerr << "Exspected closing Parenthesis!\n";
 				exit(-1);
 
 			}
@@ -248,10 +250,18 @@ BinaryTree* parse(char*& input, int previous_precedence) {
 			break;
 
 		}
+
+		case TokenType::BINARY_OPERATOR: {
+
+			left = new BinaryTree(0);
+			input = previous_input; //Undo the peeking of the operator-token
+			break;
+
+		}
 	
 		default: {
 
-			std::cerr << "Exspected Primary!";
+			std::cerr << "Exspected Primary!\n";
 			exit(-1);
 
 		}
@@ -275,6 +285,22 @@ BinaryTree* parse(char*& input, int previous_precedence) {
 	}
 
 	return left;
+
+}
+
+BinaryTree* parse(char*& input) {
+
+	BinaryTree* result = parse(input, 0);
+
+	Token last = nextToken(input);
+	if(last.type != TokenType::END_OF_FILE) {
+
+		std::cerr << "Exspected operator!\n";
+		exit(-1);
+
+	}
+
+	return result;
 
 }
 
@@ -316,7 +342,7 @@ int main() {
 
 		char* input_modifiable = input; //Create a copy of the pointer, that will later be offset
 
-		BinaryTree* tree = parse(input_modifiable, 0);
+		BinaryTree* tree = parse(input_modifiable);
 		std::cout << solve(*tree) << '\n';
 		delete tree;
 
