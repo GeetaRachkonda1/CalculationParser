@@ -238,7 +238,7 @@ BinaryTree* parse(char*& input, const int& previous_precedence) {
 
 		case TokenType::OPEN_PARENTHESIS: {
 
-			left = parse(input); //Parse the in parenthesis enclosed part as a sub-calculation
+			left = parse(input, 0); //Parse the in parenthesis enclosed part as a sub-calculation
 
 			if(nextToken(input).type != TokenType::CLOSE_PARENTHESIS) { //Check for closing parenthesis
 
