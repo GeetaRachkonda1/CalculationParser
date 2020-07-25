@@ -2,4 +2,5 @@
 A simple work in progress calculation parser, written in C++.
 
 ## How to use
-Simply download 'Main.cpp' and 'LICENSE.md' and use them in your projects. The main file already contains a simple demo, so you theoretically can just compile it to get a console window where you can enter your calculation and its result will be returned.
+Simply download the single-file libtary #include them in your own projects. To get started, you can compile one of the demos. Currently there is only 1 demo:
+- __SolveCalculations__: A terminal, where you can enter the calculations you want it to solve.
