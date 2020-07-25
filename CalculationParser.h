@@ -257,8 +257,7 @@ namespace CalculationParser {
 			Token last = Lexer::nextToken(input);
 			if(last.type != TokenType::END_OF_FILE) {
 
-				std::cerr << "Exspected operator!\n";
-				exit(-1);
+				throw std::exception("Exspected operator!");
 
 			}
 
@@ -288,8 +287,7 @@ namespace CalculationParser {
 
 					if(Lexer::nextToken(input).type != TokenType::CLOSE_PARENTHESIS) { //Check for closing parenthesis
 
-						std::cerr << "Exspected closing Parenthesis!\n";
-						exit(-1);
+						throw std::exception("Exspected closing Parenthesis!");
 
 					}
 
@@ -307,8 +305,7 @@ namespace CalculationParser {
 
 				default: {
 
-					std::cerr << "Exspected Primary!\n";
-					exit(-1);
+					throw std::exception("Exspected primary!");
 
 				}
 

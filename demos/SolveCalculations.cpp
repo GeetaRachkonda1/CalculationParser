@@ -12,11 +12,19 @@ int main() {
 		std::cout << ">> ";
 		std::cin.getline(input, 64);
 
-		char* input_modifiable = input; //Create a copy of the pointer, that will later be offset
+		try {
 
-		BinaryTree* tree = Parser::parseCalculation(input_modifiable);
-		std::cout << Parser::solve(*tree) << '\n';
-		delete tree;
+			char* input_modifiable = input; //Create a copy of the pointer, that will later be offset
+
+			BinaryTree* tree = Parser::parseCalculation(input_modifiable);
+			std::cout << Parser::solve(*tree) << "\n\n";
+			delete tree;
+
+		} catch(std::exception exception) {
+
+			std::cerr << exception.what() << "\n\n";
+
+		}
 
 	}
 
