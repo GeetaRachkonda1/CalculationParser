@@ -7,13 +7,13 @@ namespace CalculationParser {
 
 	enum class TokenType : char {
 
-		INVALID = -1,		//A invalid Token
-		END_OF_FILE = 0,	//The Null-Termination Character at the end of every file
+		INVALID = -1,
+		END_OF_FILE = 0,	//The null-termination character
 
 		BINARY_OPERATOR,	//A binary operator (+,-,*,/,%,&,&&,|,||,^)
 		NUMBER,				//A positive non-floating number (0,1,2,...)
-		OPEN_PARENTHESIS,	//A opening parenthesis: (
-		CLOSE_PARENTHESIS	//A closing patenthesis: )
+		OPEN_PARENTHESIS,
+		CLOSE_PARENTHESIS
 
 	};
 
@@ -87,7 +87,7 @@ namespace CalculationParser {
 
 		static Token nextToken(char*& input) {
 
-			while(isspace(*input)) input++; //Skip all spaces not coresponding to a token
+			while(isspace(*input)) input++; //Skip all whitespaces not coresponding to a token
 
 			switch(*input) {
 
@@ -100,6 +100,7 @@ namespace CalculationParser {
 
 				}
 				case ')': {
+
 					input++;
 					return Token(TokenType::CLOSE_PARENTHESIS);
 
@@ -139,7 +140,7 @@ namespace CalculationParser {
 
 					}
 
-					return Token(TokenType::INVALID); //Invalid token
+					return Token(TokenType::INVALID);
 
 				}
 
@@ -151,11 +152,11 @@ namespace CalculationParser {
 
 	struct BinaryTree {
 
-		int operation; //The operator or Null to specify that this node contains a number
+		int operation; //The operator or null to specify that this node contains the number itself
 
 		union {
 
-			BinaryTree* children[2]; //The 2 children (left and right) of the tree
+			BinaryTree* children[2]; //The 2 children (left and right) of the tree (only if operator is not null)
 			int number;
 
 		};
@@ -233,7 +234,7 @@ namespace CalculationParser {
 
 		static int binaryOperation(int left, int operation, int right) {
 
-			switch(operation) { //Apply the operator to the values
+			switch(operation) { //Apply the specified operator to the values
 
 				case '+': return (left + right);
 				case '-': return (left - right);
@@ -283,7 +284,7 @@ namespace CalculationParser {
 
 				case TokenType::OPEN_PARENTHESIS: {
 
-					left = parseSubCalculation(input, 0); //Parse the in parenthesis enclosed part as a sub-calculation
+					left = parseSubCalculation(input, 0); //Parse this sub-part as another calculation
 
 					if(Lexer::nextToken(input).type != TokenType::CLOSE_PARENTHESIS) { //Check for closing parenthesis
 
@@ -298,7 +299,7 @@ namespace CalculationParser {
 				case TokenType::BINARY_OPERATOR: {
 
 					left = new BinaryTree(0);
-					input = previous_input; //Undo the peeking of the operator-token
+					input = previous_input; //Unget the operator-token
 					break;
 
 				}
@@ -319,7 +320,7 @@ namespace CalculationParser {
 
 				if((operation.type != TokenType::BINARY_OPERATOR) || !precedence || (precedence <= previous_precedence)) {
 
-					input = previous_input; //Undo the peeking of the operator-token
+					input = previous_input; //Unget the operator-token
 					break;
 
 				}
