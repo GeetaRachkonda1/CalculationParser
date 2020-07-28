@@ -1,110 +1,137 @@
 #pragma once
-
-#include <iostream>
+#ifndef CALCULATION_PARSER_H
+#define CALCULATION_PARSER_H
+	
 #include <cctype>
-
-namespace CalculationParser {
-
+#include <exception>
+#include <iostream>
+	
 	enum class TokenType : char {
-
-		INVALID = -1,
-		END_OF_FILE = 0,	//The null-termination character
-
-		BINARY_OPERATOR,	//A binary operator (+,-,*,/,%,&,&&,|,||,^)
-		NUMBER,				//A positive non-floating number (0,1,2,...)
-		OPEN_PARENTHESIS,
-		CLOSE_PARENTHESIS
-
+		END_OF_FILE = '\0',
+		OPEN_PARENTHESIS = '(',
+		CLOSE_PARENTHESIS = ')',
+	
+		NUMBER,
+		BINARY_OPERATOR
 	};
-
+	
 	struct Token {
-
 		TokenType type;
-
-		int number;
-
-		Token(TokenType type) : type(type), number(0) {};
-		Token(TokenType type, int number) : type(type), number(number) {};
-
+	
+		union {
+			int integer; //TODO: Allow floating-point numbers
+			char character;
+		};
+	
+		Token(TokenType type) : type(type) {};
+		Token(TokenType type, int integer) : type(type), integer(integer) {};
+		Token(TokenType type, char character) : type(type), character(character) {};
+	};
+	
+	static std::ostream& operator<<(std::ostream& stream, const Token& token) {
+		stream << '[';
+	
+		switch(token.type) {
+			case TokenType::END_OF_FILE:	   return stream << "EOF]";
+			case TokenType::OPEN_PARENTHESIS:  return stream << "(]";
+			case TokenType::CLOSE_PARENTHESIS: return stream << ")]";
+	
+			case TokenType::BINARY_OPERATOR:   return stream << "Binary Operator: " << (char) token.character << ']';
+			case TokenType::NUMBER:			   return stream << "Number: " << token.integer << ']';
+		}
+	}
+	
+	enum class TreeType {
+		BINARY_OPERATION,
+		NUMBER
+	};
+	
+	struct Tree {
+		TreeType type;
+		Tree* children[2]; //TODO: Make these 2 pointers somehow optional
+	
+		union {
+			int integer;
+			char character;
+		};
+	
+		Tree(TreeType type) : type(type) {};
+		Tree(int integer) : type(TreeType::NUMBER), integer(integer) {};
+		Tree(Tree* left, char character, Tree* right) : type(TreeType::BINARY_OPERATION), character(character) {
+			children[0] = left;
+			children[1] = right;
+		};
+	
+		int solve() const noexcept {
+			if(type == TreeType::NUMBER) return integer;
+	
+			int left = children[0]->solve();
+			int right = children[1]->solve();
+	
+			switch(character) { //Apply the specified operator to the values
+				case '+':  return (left + right);
+				case '-':  return (left - right);
+				case '*':  return (left * right);
+				case '/':  return (left / right);
+				case '%':  return (left % right);
+				case '&':  return (left & right);
+				case '^':  return (left ^ right);
+				case '|':  return (left | right);
+				case '\'': return (left && right);
+				case '}':  return (left || right);
+			}
+		}
+	
+		void print(std::ostream& stream = std::cout, int representation_offset = 0) {
+			stream << std::string(representation_offset, ' ') << "> ";
+	
+			if(type == TreeType::BINARY_OPERATION) {
+				stream << (char) character << '\n';
+	
+				representation_offset += 2;
+				children[0]->print(stream, representation_offset);
+				children[1]->print(stream, representation_offset);
+			} else {
+				stream << integer << '\n';
+			}
+		}
 	};
 
-	static std::ostream& operator<<(std::ostream& stream, const Token& token) {
+	struct CalculationParser {
+		static int getPrecedence(char operation) {
+			switch(operation) {
+				case '*': case '/': case '%': return 8;
+				case '+': case '-':			  return 7;
+				case '&':					  return 6;
+				case '^':					  return 4;
+				case '|':					  return 3;
+				case '\'':					  return 2; //=('&' + 1)
+				case '}':					  return 1; //=('|' + 1)
 
-		stream << '[';
-
-		switch(token.type) {
-
-			case TokenType::INVALID: {
-
-				stream << "INVALID";
-				break;
-
+				default: return 0;
 			}
-
-			case TokenType::END_OF_FILE: {
-
-				stream << "EOF";
-				break;
-
-			}
-
-			case TokenType::BINARY_OPERATOR: {
-
-				stream << "Binary Operator: " << (char) token.number;
-				break;
-
-			}
-
-			case TokenType::NUMBER: {
-
-				stream << "Number: " << token.number;
-				break;
-
-			}
-
-			case TokenType::OPEN_PARENTHESIS: {
-
-				stream << '(';
-				break;
-
-			}
-
-			case TokenType::CLOSE_PARENTHESIS: {
-
-				stream << ')';
-				break;
-
-			}
-
 		}
 
-		stream << ']';
-		return stream;
+		static bool getAssociativity(char operation) {
+			switch(operation) {
+				case '*': case '/': case '%': case '+': case '-': case '&': case '^': case '|': case '\'': case '}': return true; //Left-to-right
+				default: return false; //Right-to-left
+			}
+		}
 
-	}
+		char* input;
 
-	struct Lexer {
+		CalculationParser()							  {};
+		CalculationParser(char* input) : input(input) {};
 
-		static Token nextToken(char*& input) {
-
+		Token nextToken() {
 			while(isspace(*input)) input++; //Skip all whitespaces not coresponding to a token
 
 			switch(*input) {
+				case '\0': return Token(TokenType::END_OF_FILE);
 
-				case '\0': return Token(TokenType::END_OF_FILE); //Single-character tokens
-
-				case '(': {
-
-					input++;
-					return Token(TokenType::OPEN_PARENTHESIS);
-
-				}
-				case ')': {
-
-					input++;
-					return Token(TokenType::CLOSE_PARENTHESIS);
-
-				}
+				case ')':
+				case '(': return Token((TokenType) * (input++));
 
 				case '+':
 				case '-':
@@ -113,233 +140,119 @@ namespace CalculationParser {
 				case '%':
 				case '^': return Token(TokenType::BINARY_OPERATOR, *(input++)); //Single-character operators
 
-				case '&':
-				case '|': { //Possible double-character operators
-
-					if(*input == *(input++)) return Token(TokenType::BINARY_OPERATOR, (*(input++) + 256));
-					return Token(TokenType::BINARY_OPERATOR, *input);
-
-				}
-
-				default: { //Non single-character Tokens
-
-					if(isdigit(*input)) { //Check for number token
-
-						int number = 0;
-
-						while(isdigit(*input)) {
-
-							number *= 10;
-							number += (*input - '0'); //Convert character to representing digit
-
+				#ifdef UNICODE
+					case '&':
+					case '|': {
+						if(*input == *(input + 1)) {
 							input++;
-
+							return Token(TokenType::BINARY_OPERATOR, (char) (*(input++) + 1));
+						}
+						return Token(TokenType::BINARY_OPERATOR, *(input++));
+					}
+				#else
+					case '&': {
+						if(*(++input) == '&') {
+							input++;
+							return Token(TokenType::BINARY_OPERATOR, '\'');	//=('&' + 1)
 						}
 
-						return Token(TokenType::NUMBER, number);
-
+						return Token(TokenType::BINARY_OPERATOR, '&');
 					}
 
-					return Token(TokenType::INVALID);
+					case '|': {
+						if(*(++input) == '|') {
+							input++;
+							return Token(TokenType::BINARY_OPERATOR, '}');	//=('|' + 1)
+						}
 
+						return Token(TokenType::BINARY_OPERATOR, '|');
+					}
+				#endif
+
+				default: { //Non single-character Tokens
+					if(isdigit(*input)) {
+						int primary = (*input - '0');
+
+						while(isdigit(*(++input))) {
+							primary *= 10;
+
+							#ifdef UNICODE	//Convert character to representing digit
+								primary += (*input - '0');
+							#elif
+								switch(*input) {
+									case '1': { primary += 1; } break;
+									case '2': { primary += 2; } break;
+									case '3': { primary += 3; } break;
+									case '4': { primary += 4; } break;
+									case '5': { primary += 5; } break;
+									case '6': { primary += 6; } break;
+									case '7': { primary += 7; } break;
+									case '8': { primary += 8; } break;
+									case '9': { primary += 9; } break;
+								}
+							#endif
+						}
+
+						return Token(TokenType::NUMBER, primary);
+					}
+
+					throw std::exception("Unknown token!");
 				}
-
 			}
-
-		}
-
-	};
-
-	struct BinaryTree {
-
-		int operation; //The operator or null to specify that this node contains the number itself
-
-		union {
-
-			BinaryTree* children[2]; //The 2 children (left and right) of the tree (only if operator is not null)
-			int number;
-
 		};
 
-		BinaryTree(int number) : operation(0), number(number) {};
-		BinaryTree(BinaryTree* left, int operation, BinaryTree* right) : operation(operation) {
-
-			children[0] = left;
-			children[1] = right;
-
-		}
-
-		~BinaryTree() {
-
-			if(operation) {
-
-				delete children[0];
-				delete children[1];
-
-			}
-
-		}
-
-	};
-
-	static std::ostream& operator<<(std::ostream& stream, const BinaryTree& tree);
-
-	static std::ostream& printBinaryTree(std::ostream& stream, const BinaryTree& tree, int representation_offset) {
-
-		stream << std::string(representation_offset, ' ') << "> ";
-
-		if(tree.operation) {
-
-			stream << (char) tree.operation << '\n';
-
-			representation_offset += 2;
-			stream << *tree.children[0];
-			stream << *tree.children[1];
-
-		} else {
-
-			stream << tree.number << '\n';
-
-		}
-
-		return stream;
-
-	}
-
-	static std::ostream& operator<<(std::ostream& stream, const BinaryTree& tree) {
-
-		return printBinaryTree(stream, tree, 0);
-
-	}
-
-	struct Parser {
-
-		static int getPrecedence(int operation) {
-
-			switch(operation) {
-
-				case '*': case '/': case '%': return 7;
-				case '+': case '-': return 6;
-				case '&': return 5;
-				case '|': return 4;
-				case ('&' + 256): return 3;
-				case '^': return 2;
-				case ('|' + 256): return 1;
-
-				default: return 0;
-
-			}
-
-		}
-
-		static int binaryOperation(int left, int operation, int right) {
-
-			switch(operation) { //Apply the specified operator to the values
-
-				case '+': return (left + right);
-				case '-': return (left - right);
-				case '*': return (left * right);
-				case '/': return (left / right);
-				case '%': return (left % right);
-				case '&': return (left & right);
-				case '^': return (left ^ right);
-				case '|': return (left | right);
-				case ('&' + 256): return (left && right);
-				case ('|' + 256): return (left || right);
-
-			}
-
-		}
-
-		static BinaryTree* parseCalculation(char*& input) {
-
-			BinaryTree* result = parseSubCalculation(input, 0);
-
-			Token last = Lexer::nextToken(input);
-			if(last.type != TokenType::END_OF_FILE) {
-
-				throw std::exception("Exspected operator!");
-
-			}
-
-			return result;
-
-		}
-
-		static BinaryTree* parseSubCalculation(char*& input, int previous_precedence) {
-
+		Tree* parseSub(int previous_precedence) throw(std::exception) {
 			char* previous_input = input;
-			Token primary = Lexer::nextToken(input);
+			Token primary = nextToken();
 
-			BinaryTree* left;
+			Tree* left;
 
 			switch(primary.type) {
-
 				case TokenType::NUMBER: {
-
-					left = new BinaryTree(primary.number);
+					left = new Tree(primary.integer);
 					break;
-
 				}
 
 				case TokenType::OPEN_PARENTHESIS: {
+					left = parseSub(0); //Parse this sub-part as another calculation
 
-					left = parseSubCalculation(input, 0); //Parse this sub-part as another calculation
-
-					if(Lexer::nextToken(input).type != TokenType::CLOSE_PARENTHESIS) { //Check for closing parenthesis
-
+					if(nextToken().type != TokenType::CLOSE_PARENTHESIS) { //Check for closing parenthesis
 						throw std::exception("Exspected closing Parenthesis!");
-
 					}
 
 					break;
-
-				}
-
-				case TokenType::BINARY_OPERATOR: {
-
-					left = new BinaryTree(0);
-					input = previous_input; //Unget the operator-token
-					break;
-
 				}
 
 				default: {
-
 					throw std::exception("Exspected primary!");
-
 				}
-
 			}
 
 			while(true) {
-
 				previous_input = input;
-				Token operation = Lexer::nextToken(input);
-				int precedence = getPrecedence(operation.number);
 
-				if((operation.type != TokenType::BINARY_OPERATOR) || !precedence || (precedence <= previous_precedence)) {
+				Token operation = nextToken();
+				int precedence = getPrecedence(operation.character);
 
+				if((operation.type != TokenType::BINARY_OPERATOR) || !precedence || (getAssociativity(operation.character) ? (precedence <= previous_precedence) : (precedence < previous_precedence))) { //Check type, precedence and associativity
 					input = previous_input; //Unget the operator-token
 					break;
-
 				}
 
-				left = new BinaryTree(left, operation.number, parseSubCalculation(input, precedence));
-
+				left = new Tree(left, operation.character, parseSub(precedence));
 			}
 
 			return left;
-
 		}
 
-		static int solve(const BinaryTree& tree) {
+		Tree* parse() {
+			Tree* result = parseSub(0);
 
-			if(!tree.operation) return tree.number;
-			return Parser::binaryOperation(solve(*(tree.children[0])), tree.operation, solve(*(tree.children[1])));
+			if(nextToken().type != TokenType::END_OF_FILE) {
+				throw std::exception("Exspected operator!");
+			}
 
+			return result;
 		}
-
 	};
-
-}
+#endif
